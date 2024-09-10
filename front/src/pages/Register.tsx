@@ -2,11 +2,10 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
-export const Login = () => {
+export const Register = () => {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [emailError, setEmailError] = useState("");
   const [passError, setPasssError] = useState("");
-  const [twoFACode, setTwoFACode] = useState("");
   const navigate = useNavigate();
 
   const handleForm = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,7 +41,7 @@ export const Login = () => {
   const handleSubmit = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     e.preventDefault();
     if (handlePassword() && handleEmailSyntax()) {
-      fetch(`http://127.0.0.1:3000/login`, {
+      fetch(`http://127.0.0.1:3000/register`, {
         method: "POST",
         body: JSON.stringify({
           login: loginData.email,
@@ -52,12 +51,10 @@ export const Login = () => {
           "Content-Type": "application/json", // This line is important
         },
       })
-        .then(async (data) => {
+        .then((data) => {
           if (data.ok) {
             console.log(data);
-            const jsonData = await data.json();
-            localStorage.setItem("userData", JSON.stringify(jsonData));
-            return navigate(`/userdata`);
+            return navigate(`/login`);
           } else throw data;
         })
         .catch((err) => {
@@ -73,7 +70,7 @@ export const Login = () => {
         <article className="flex flex-col 2xl:w-1/2 w-3/4 ">
           <form action="#" className="w-full">
             <p className="mt-10 mb-5 text-xl text-center">
-              Please login to your account
+              Register new Account
             </p>
             <p className="w-full mb-1 pl-4 text-error text-sm">{emailError}</p>
             <input
@@ -99,18 +96,9 @@ export const Login = () => {
               onClick={(e) => handleSubmit(e)}
               className="w-full gradient-button"
             >
-              Login
-            </button>
-          </form>
-          <div className="w-full flex justify-between 2xl:mt-[8rem] mt-[4rem] items-center">
-            <p>Don't have an account?</p>
-            <button
-              onClick={() => navigate("/register")}
-              className="register-button"
-            >
               Register
             </button>
-          </div>
+          </form>
         </article>
       </section>
     </main>

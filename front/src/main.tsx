@@ -9,6 +9,7 @@ import { App } from "./App";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Login } from "./pages/login";
 import { UserData } from "./pages/UserData";
+import { Register } from "./pages/Register";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -16,6 +17,7 @@ createRoot(document.getElementById("root")!).render(
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
         <Route path="/userdata" element={<UserData />} />
         <Route
           path="*"
