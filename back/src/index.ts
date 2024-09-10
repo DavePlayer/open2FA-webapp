@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 import { Sequelize } from "sequelize";
 import { initializeUserModel } from "./Models/User";
 import bcrypt from "bcrypt";
+import cors from "cors";
+import jwt from "jsonwebtoken";
 
 const DB = new Sequelize("sqlite::memory:");
 const User = initializeUserModel(DB);
@@ -13,6 +15,7 @@ dotenv.config();
 const app: Express = express();
 const port = process.env.PORT || 3000;
 app.use(express.json());
+app.use(cors());
 app.use(express.urlencoded({ extended: true }));
 
 app.get("/", (req: Request, res: Response) => {
@@ -31,27 +34,47 @@ app.post("/login", async (req: Request, res: Response) => {
   }
   const { login, password } = req.body;
 
-  if (!login || !password)
-    return res.status(403).send("invalid body structure");
+  if (!login || !password) {
+    console.log(req.body);
+    res.statusMessage = "invalid body structure";
+    return res.status(403).end();
+  }
 
   try {
     const foundUser = await User.findOne({
       where: {
-        name: login,
+        email: login,
       },
     });
 
     if (!foundUser) {
-      return res.status(404).send("User not found");
+      res.statusMessage = "User Not Found";
+      return res.status(404).end();
     }
 
-    const isMatch = await bcrypt.compare(password, foundUser.password || "");
+    const isMatch = await bcrypt.compare(password, foundUser.password);
 
-    return res.json({
-      id: foundUser.id,
-      name: foundUser.name,
-      isTwoFAon: foundUser.isTwoFAon,
-    });
+    if (isMatch) {
+      if (!process.env.JWT_SECRET) {
+        console.error("JWT_SECRET enviromental variable is undefined");
+        res.statusMessage = "JWT secret is undefined";
+        return res.status(500).end();
+      }
+
+      const user = {
+        id: foundUser.id,
+        email: foundUser.email,
+      };
+      const token = jwt.sign(user, process.env.JWT_SECRET as string);
+      return res.json({
+        ...user,
+        token,
+      });
+    } else {
+      console.log(password, foundUser.password);
+      res.statusMessage = "Passwords do not match";
+      return res.status(403).end();
+    }
   } catch (err) {
     console.error("Error during user lookup:", err);
     res.status(500).send({ error: "Internal server error", details: err });
@@ -69,25 +92,29 @@ app.post("/register", async (req: Request, res: Response) => {
   try {
     const foundUser = await User.findOne({
       where: {
-        name: login,
+        email: login,
       },
     });
 
     if (!foundUser) {
       const createdUser = await User.create({
-        name: login,
-        password: password,
+        email: login,
+        password: bcrypt.hashSync(
+          password,
+          bcrypt.genSaltSync(parseInt(process.env.SALT as string))
+        ),
         isTwoFAon: false,
       });
 
       return res.json({
         id: createdUser.id,
-        name: createdUser.name,
+        email: createdUser.email,
         isTwoFAon: createdUser.isTwoFAon,
       });
     }
 
-    return res.status(408).send("user already registered");
+    res.statusMessage = "user already exist";
+    return res.status(408).end();
   } catch (err) {
     console.error("Error during user lookup:", err);
     res.status(500).send({ error: "Internal server error", details: err });

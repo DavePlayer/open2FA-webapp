@@ -3,7 +3,7 @@ import { DataTypes, Model, Optional, Sequelize } from "sequelize";
 // Define the attributes of the User model
 export interface UserAttributes {
   id: number;
-  name: string;
+  email: string;
   password: string;
   isTwoFAon: boolean;
 }
@@ -18,7 +18,7 @@ export class User
   implements UserAttributes
 {
   public id!: number;
-  public name!: string;
+  public email!: string;
   public password!: string;
   public isTwoFAon!: boolean;
 
@@ -36,7 +36,7 @@ export function initializeUserModel(sequelize: Sequelize): typeof User {
         primaryKey: true,
         autoIncrement: true,
       },
-      name: {
+      email: {
         type: DataTypes.STRING,
         allowNull: false,
       },
