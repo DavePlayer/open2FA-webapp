@@ -6,6 +6,8 @@ export interface UserAttributes {
   email: string;
   password: string;
   isTwoFAon: boolean;
+  twoFaHash?: string | null;
+  tempTwoFaHash?: string | null;
 }
 
 // Define creation attributes (making id optional for model creation)
@@ -21,6 +23,8 @@ export class User
   public email!: string;
   public password!: string;
   public isTwoFAon!: boolean;
+  public twoFaHash!: string | null;
+  public tempTwoFaHash!: string | null;
 
   // Timestamps
   public readonly createdAt!: Date;
@@ -47,6 +51,14 @@ export function initializeUserModel(sequelize: Sequelize): typeof User {
       isTwoFAon: {
         type: DataTypes.BOOLEAN,
         allowNull: false,
+      },
+      twoFaHash: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      tempTwoFaHash: {
+        type: DataTypes.STRING,
+        allowNull: true,
       },
     },
     {

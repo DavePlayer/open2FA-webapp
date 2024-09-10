@@ -7,6 +7,10 @@ import bcrypt from "bcrypt";
 import cors from "cors";
 import jwt from "jsonwebtoken";
 
+import { authenticator } from "otplib";
+import qrcode from "qrcode";
+import { validateJWT } from "./middleware/validateJWT";
+
 const DB = new Sequelize("sqlite::memory:");
 const User = initializeUserModel(DB);
 
@@ -32,7 +36,7 @@ app.post("/login", async (req: Request, res: Response) => {
   if (!req.body) {
     return res.status(400).send("Request body is missing");
   }
-  const { login, password } = req.body;
+  const { login, password, code } = req.body;
 
   if (!login || !password) {
     console.log(req.body);
@@ -61,9 +65,17 @@ app.post("/login", async (req: Request, res: Response) => {
         return res.status(500).end();
       }
 
+      if (foundUser.isTwoFAon) {
+        if (!code) {
+          res.statusMessage = "no 2FA code provided";
+          return res.send({ codeRequired: true });
+        }
+      }
+
       const user = {
         id: foundUser.id,
         email: foundUser.email,
+        is2FAon: foundUser.isTwoFAon,
       };
       const token = jwt.sign(user, process.env.JWT_SECRET as string);
       return res.json({
@@ -79,6 +91,81 @@ app.post("/login", async (req: Request, res: Response) => {
     console.error("Error during user lookup:", err);
     res.status(500).send({ error: "Internal server error", details: err });
   }
+});
+
+app.post("/getTwoFAQrCode", validateJWT, async (req, res) => {
+  const { token } = req.body;
+  const userData = token;
+
+  const user = await User.findOne({
+    where: {
+      id: token.id,
+    },
+  });
+
+  if (!user) {
+    res.statusMessage = "sth went wrong. user for qrimage does not exist";
+    return res.end();
+  }
+
+  const secret = authenticator.generateSecret();
+  const uri = authenticator.keyuri(userData.id, "OmegaLoveIssac", secret);
+
+  const image = await qrcode.toDataURL(uri);
+
+  await user.update({ isTwoFAon: true, tempTwoFaHash: secret });
+  await user.save();
+
+  console.log(image, uri);
+  res.json({
+    image,
+  });
+});
+
+app.post("/registerTwoFA", validateJWT, async (req, res) => {
+  if (!req.body) {
+    return res.status(400).send("Request body is missing");
+  }
+  const { code, token } = req.body;
+
+  const user = await User.findOne({
+    where: {
+      id: token.id,
+    },
+  });
+
+  if (!code) {
+    console.log(req.body);
+    res.statusMessage = "invalid body structure";
+    return res.status(403).end();
+  }
+
+  if (!user) {
+    res.statusMessage = "sth went wrong. user for code a user does not exist";
+    return res.end();
+  }
+
+  if (user.isTwoFAon == false || user.tempTwoFaHash == null) {
+    res.statusMessage =
+      "User is not ready to have 2fa ON. no qr image for an app was created prior";
+    return res.end();
+  }
+
+  const verified = authenticator.check(code, user.tempTwoFaHash);
+
+  if (!verified) {
+    res.statusMessage = "code does not match the user secret";
+    return res.end();
+  }
+
+  await user.update({
+    isTwoFAon: true,
+    twoFaHash: user.tempTwoFaHash,
+    tempTwoFaHash: null,
+  });
+  await user.save();
+
+  res.send("ok");
 });
 
 app.post("/register", async (req: Request, res: Response) => {
