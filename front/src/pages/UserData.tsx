@@ -38,8 +38,14 @@ export const UserData = () => {
         Authorization: `${userData.token}`,
       },
     }).then(async (data) => {
-      const jsonData = await data.json();
-      setQrCode(jsonData.image);
+      localStorage.setItem(
+        "userData",
+        JSON.stringify({
+          ...userData,
+          is2FAon: true,
+        })
+      );
+      setQrCode(null);
     });
   };
 
@@ -74,7 +80,7 @@ export const UserData = () => {
                 onClick={(e) => handleSubmit(e)}
                 className="w-full gradient-button"
               >
-                Login
+                set new 2FA
               </button>
             </>
           ) : (
@@ -82,7 +88,7 @@ export const UserData = () => {
               onClick={(e) => handleGetQR(e)}
               className="w-full gradient-button"
             >
-              Get qrCode for 2FA
+              Setup 2FA
             </button>
           )}
         </form>

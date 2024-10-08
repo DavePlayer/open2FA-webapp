@@ -56,6 +56,8 @@ app.post("/login", async (req: Request, res: Response) => {
       return res.status(404).end();
     }
 
+    console.log(foundUser);
+
     const isMatch = await bcrypt.compare(password, foundUser.password);
 
     if (isMatch) {
@@ -68,7 +70,14 @@ app.post("/login", async (req: Request, res: Response) => {
       if (foundUser.isTwoFAon) {
         if (!code) {
           res.statusMessage = "no 2FA code provided";
-          return res.send({ codeRequired: true });
+          return res.status(401).send({ codeRequired: true });
+        }
+
+        const verified = authenticator.check(code, foundUser.twoFaHash || "");
+
+        if (!verified) {
+          res.statusMessage = "invalid Code";
+          return res.status(403).end();
         }
       }
 
@@ -105,7 +114,7 @@ app.post("/getTwoFAQrCode", validateJWT, async (req, res) => {
 
   if (!user) {
     res.statusMessage = "sth went wrong. user for qrimage does not exist";
-    return res.end();
+    return res.status(500).end();
   }
 
   const secret = authenticator.generateSecret();
@@ -142,20 +151,20 @@ app.post("/registerTwoFA", validateJWT, async (req, res) => {
 
   if (!user) {
     res.statusMessage = "sth went wrong. user for code a user does not exist";
-    return res.end();
+    return res.status(500).end();
   }
 
   if (user.isTwoFAon == false || user.tempTwoFaHash == null) {
     res.statusMessage =
       "User is not ready to have 2fa ON. no qr image for an app was created prior";
-    return res.end();
+    return res.status(404).end();
   }
 
   const verified = authenticator.check(code, user.tempTwoFaHash);
 
   if (!verified) {
     res.statusMessage = "code does not match the user secret";
-    return res.end();
+    return res.status(403).end();
   }
 
   await user.update({

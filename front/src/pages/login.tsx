@@ -7,6 +7,7 @@ export const Login = () => {
   const [emailError, setEmailError] = useState("");
   const [passError, setPasssError] = useState("");
   const [twoFACode, setTwoFACode] = useState("");
+  const [twoFArequired, setTwoFArequired] = useState(false);
   const navigate = useNavigate();
 
   const handleForm = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -47,6 +48,7 @@ export const Login = () => {
         body: JSON.stringify({
           login: loginData.email,
           password: loginData.password,
+          ...(twoFArequired && { code: twoFACode }),
         }),
         headers: {
           "Content-Type": "application/json", // This line is important
@@ -62,7 +64,9 @@ export const Login = () => {
         })
         .catch((err) => {
           console.error(err);
-          toast.error(err.statusText);
+          if (err.statusText != "no 2FA code provided")
+            toast.error(err.statusText);
+          else setTwoFArequired(true);
         });
     }
   };
@@ -72,35 +76,63 @@ export const Login = () => {
       <section className="w-1/2 m-auto flex justify-center items-center text-default-color">
         <article className="flex flex-col 2xl:w-1/2 w-3/4 ">
           <form action="#" className="w-full">
-            <p className="mt-10 mb-5 text-xl text-center">
-              Please login to your account
-            </p>
-            <p className="w-full mb-1 pl-4 text-error text-sm">{emailError}</p>
-            <input
-              className="w-full mb-4"
-              type="email"
-              name="email"
-              placeholder="E-mail"
-              value={loginData.email}
-              onChange={(e) => handleForm(e)}
-              onBlur={() => handleEmailSyntax()}
-            />
-            <p className="w-full mb-1 pl-4 text-error text-sm">{passError}</p>
-            <input
-              className="w-full"
-              type="password"
-              name="password"
-              placeholder="Password"
-              value={loginData.password}
-              onChange={(e) => handleForm(e)}
-              onBlur={() => handlePassword()}
-            />
-            <button
-              onClick={(e) => handleSubmit(e)}
-              className="w-full gradient-button"
-            >
-              Login
-            </button>
+            {twoFArequired ? (
+              <>
+                <p className="mt-10 mb-5 text-xl text-center">
+                  Please login to your account
+                </p>
+                <input
+                  className="w-full"
+                  type="number"
+                  name="2FACode"
+                  placeholder="2FA Code"
+                  value={twoFACode}
+                  onChange={(e) => setTwoFACode(e.target.value)}
+                />
+                <button
+                  onClick={(e) => handleSubmit(e)}
+                  className="w-full gradient-button"
+                >
+                  Confirm
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="mt-10 mb-5 text-xl text-center">
+                  Please login to your account
+                </p>
+                <p className="w-full mb-1 pl-4 text-error text-sm">
+                  {emailError}
+                </p>
+                <input
+                  className="w-full mb-4"
+                  type="email"
+                  name="email"
+                  placeholder="E-mail"
+                  value={loginData.email}
+                  onChange={(e) => handleForm(e)}
+                  onBlur={() => handleEmailSyntax()}
+                />
+                <p className="w-full mb-1 pl-4 text-error text-sm">
+                  {passError}
+                </p>
+                <input
+                  className="w-full"
+                  type="password"
+                  name="password"
+                  placeholder="Password"
+                  value={loginData.password}
+                  onChange={(e) => handleForm(e)}
+                  onBlur={() => handlePassword()}
+                />
+                <button
+                  onClick={(e) => handleSubmit(e)}
+                  className="w-full gradient-button"
+                >
+                  Login
+                </button>
+              </>
+            )}
           </form>
           <div className="w-full flex justify-between 2xl:mt-[8rem] mt-[4rem] items-center">
             <p>Don't have an account?</p>
