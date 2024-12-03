@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { socket } from "../socket";
+import forge from "node-forge";
 
 export const Login = () => {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
@@ -9,6 +11,7 @@ export const Login = () => {
   const [twoFACode, setTwoFACode] = useState("");
   const [twoFArequired, setTwoFArequired] = useState(false);
   const navigate = useNavigate();
+  const [isConnected, setIsConnected] = useState(socket.connected);
 
   const handleForm = (e: React.ChangeEvent<HTMLInputElement>) => {
     setLoginData((prev) => {
@@ -69,6 +72,65 @@ export const Login = () => {
           else setTwoFArequired(true);
         });
     }
+  };
+
+  useEffect(() => {
+    socket.on("connect", () => {
+      setIsConnected(true);
+    });
+    socket.on("disconnect", () => setIsConnected(false));
+    socket.on("message", (message: string) => {
+      console.log(message);
+      if (message.includes("connId")) {
+        const [_, id] = message.split("|");
+        console.log("recieved websocket session id: ", id);
+      }
+    });
+    socket.on("sendCode", (message) => {
+      const digits = parseInt(message);
+      if (digits) {
+        console.log("recieved 2faCode: ", digits);
+      }
+    });
+    generateRsaKeys();
+    return () => {
+      socket.off("connect");
+      socket.off("disconnect");
+      socket.off("message");
+    };
+  }, []);
+
+  const generateRsaKeys = async () => {
+    const keyPair = await window.crypto.subtle.generateKey(
+      {
+        name: "RSA-OAEP",
+        modulusLength: 2048,
+        publicExponent: new Uint8Array([1, 0, 1]), // 0x010001
+        hash: "SHA-256",
+      },
+      true, // Whether the keys can be extracted
+      ["encrypt", "decrypt"] // Key usage
+    );
+    // Export the keys in PEM format
+    const exportKeyToPem = async (key: CryptoKey, isPrivate: boolean) => {
+      const exported = await window.crypto.subtle.exportKey(
+        isPrivate ? "pkcs8" : "spki",
+        key
+      );
+      const exportedArray = new Uint8Array(exported);
+      let keyPem = String.fromCharCode.apply(null, exportedArray as any);
+      keyPem =
+        `-----BEGIN ${isPrivate ? "PRIVATE" : "PUBLIC"} KEY-----\n` +
+        keyPem.match(/.{1,64}/g)?.join("\n") + // Split into 64 char lines
+        `\n-----END ${isPrivate ? "PRIVATE" : "PUBLIC"} KEY-----`;
+      return keyPem;
+    };
+
+    const publicKeyPem = await exportKeyToPem(keyPair.publicKey, false);
+    const privateKeyPem = await exportKeyToPem(keyPair.privateKey, true);
+
+    console.log("Public Key:", publicKeyPem);
+    console.log("Private Key:", privateKeyPem);
   };
 
   return (
