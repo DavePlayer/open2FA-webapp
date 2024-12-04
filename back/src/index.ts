@@ -11,7 +11,10 @@ import { authenticator } from "otplib";
 import qrcode from "qrcode";
 import { validateJWT } from "./middleware/validateJWT";
 
-const DB = new Sequelize("sqlite::memory:");
+const DB = new Sequelize({
+  dialect: "sqlite",
+  storage: "/tmp/database.sqlite", // Specifies the file path for the SQLite database
+});
 const User = initializeUserModel(DB);
 
 dotenv.config();
@@ -70,7 +73,12 @@ app.post("/login", async (req: Request, res: Response) => {
       if (foundUser.isTwoFAon) {
         if (!code) {
           res.statusMessage = "no 2FA code provided";
-          return res.status(401).send({ codeRequired: true });
+          return res.status(401).json({
+            codeRequired: true,
+            issuer: "OmegaLoveIssac",
+            // this library behaves weirdly for adding this without my info, but ok
+            label: `OmegaLoceIssac:${foundUser.email}`,
+          });
         }
 
         const verified = authenticator.check(code, foundUser.twoFaHash || "");
@@ -118,7 +126,7 @@ app.post("/getTwoFAQrCode", validateJWT, async (req, res) => {
   }
 
   const secret = authenticator.generateSecret();
-  const uri = authenticator.keyuri(userData.id, "OmegaLoveIssac", secret);
+  const uri = authenticator.keyuri(userData.email, "OmegaLoveIssac", secret);
 
   const image = await qrcode.toDataURL(uri);
 
