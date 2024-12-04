@@ -2,7 +2,15 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { socket } from "../socket";
-import forge from "node-forge";
+import QRCode from "react-qr-code";
+
+interface QrCodeData {
+  relayUrl: string;
+  publicKey: string;
+  websocketId: string;
+  issuer: string;
+  label: string;
+}
 
 export const Login = () => {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
@@ -12,6 +20,13 @@ export const Login = () => {
   const [twoFArequired, setTwoFArequired] = useState(false);
   const navigate = useNavigate();
   const [isConnected, setIsConnected] = useState(socket.connected);
+  const [qrData, setQrData] = useState<QrCodeData>({
+    publicKey: "",
+    relayUrl: "10.0.0.189:9999", // TODO make relay listen on ipv4 or on every network card
+    websocketId: "",
+    issuer: "",
+    label: "",
+  });
 
   const handleForm = (e: React.ChangeEvent<HTMLInputElement>) => {
     setLoginData((prev) => {
@@ -63,13 +78,27 @@ export const Login = () => {
             const jsonData = await data.json();
             localStorage.setItem("userData", JSON.stringify(jsonData));
             return navigate(`/userdata`);
-          } else throw data;
+          } else {
+            const errorData = await data.json();
+            throw {
+              status: data.status,
+              statusText: data.statusText,
+              ...errorData,
+            };
+          }
         })
         .catch((err) => {
           console.error(err);
-          if (err.statusText != "no 2FA code provided")
-            toast.error(err.statusText);
-          else setTwoFArequired(true);
+          if (err.codeRequired) {
+            setTwoFArequired(true);
+            setQrData((prev) => {
+              prev.issuer = err.issuer;
+              prev.label = err.label;
+              return prev;
+            });
+          } else {
+            toast.error(err.message || "An error occurred");
+          }
         });
     }
   };
@@ -84,6 +113,10 @@ export const Login = () => {
       if (message.includes("connId")) {
         const [_, id] = message.split("|");
         console.log("recieved websocket session id: ", id);
+        setQrData((prev) => {
+          prev.websocketId = id;
+          return prev;
+        });
       }
     });
     socket.on("sendCode", (message) => {
@@ -100,6 +133,16 @@ export const Login = () => {
     };
   }, []);
 
+  // Helper function to convert ArrayBuffer to Base64 string
+  const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+    let binary = "";
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary);
+  };
+
   const generateRsaKeys = async () => {
     const keyPair = await window.crypto.subtle.generateKey(
       {
@@ -111,26 +154,51 @@ export const Login = () => {
       true, // Whether the keys can be extracted
       ["encrypt", "decrypt"] // Key usage
     );
-    // Export the keys in PEM format
-    const exportKeyToPem = async (key: CryptoKey, isPrivate: boolean) => {
-      const exported = await window.crypto.subtle.exportKey(
-        isPrivate ? "pkcs8" : "spki",
-        key
-      );
-      const exportedArray = new Uint8Array(exported);
-      let keyPem = String.fromCharCode.apply(null, exportedArray as any);
-      keyPem =
-        `-----BEGIN ${isPrivate ? "PRIVATE" : "PUBLIC"} KEY-----\n` +
-        keyPem.match(/.{1,64}/g)?.join("\n") + // Split into 64 char lines
-        `\n-----END ${isPrivate ? "PRIVATE" : "PUBLIC"} KEY-----`;
-      return keyPem;
+
+    // Export the public key as an ArrayBuffer
+    const exportPublicKey = async (key: CryptoKey) => {
+      const exported = await window.crypto.subtle.exportKey("spki", key); // spki for public key
+      return exported;
     };
 
-    const publicKeyPem = await exportKeyToPem(keyPair.publicKey, false);
-    const privateKeyPem = await exportKeyToPem(keyPair.privateKey, true);
+    const publicKeyBuffer = await exportPublicKey(keyPair.publicKey);
 
-    console.log("Public Key:", publicKeyPem);
-    console.log("Private Key:", privateKeyPem);
+    // Convert the ArrayBuffer to a Base64 string (safe for QR codes)
+    const publicKeyBase64 = arrayBufferToBase64(publicKeyBuffer);
+
+    // Save the base64 encoded public key in your QR data
+    setQrData((prev) => {
+      prev.publicKey = publicKeyBase64; // Store the base64 string instead of PEM
+      return prev;
+    });
+
+    console.log("Public Key (Base64):", publicKeyBase64);
+  };
+
+  const decryptData = async (
+    encryptedDataBase64: string,
+    privateKey: CryptoKey
+  ): Promise<string> => {
+    const encryptedData = Uint8Array.from(atob(encryptedDataBase64), (c) =>
+      c.charCodeAt(0)
+    ); // Decode base64 to bytes
+
+    try {
+      const decrypted = await window.crypto.subtle.decrypt(
+        {
+          name: "RSA-OAEP",
+        },
+        privateKey, // Use the private key here
+        encryptedData // The encrypted data
+      );
+
+      // Convert decrypted ArrayBuffer back to string
+      const decoder = new TextDecoder();
+      return decoder.decode(decrypted);
+    } catch (error) {
+      console.error("Decryption failed:", error);
+      return "";
+    }
   };
 
   return (
@@ -157,6 +225,21 @@ export const Login = () => {
                 >
                   Confirm
                 </button>
+                {isConnected && (
+                  <>
+                    <h3 className="w-full text-center mt-10 text-xl">
+                      Or scan this qr on Open2FA app
+                    </h3>
+                    <div className="flex justify-center items-center mt-5 w-2/3 mx-auto bg-white aspect-square">
+                      <QRCode value={JSON.stringify(qrData)} />
+                    </div>
+                    <p className="mt-5">relay url: {qrData.relayUrl}</p>
+                    <p className="mt-1">websocket id: {qrData.websocketId}</p>
+                    <p className="mt-5">issuer: {qrData.issuer}</p>
+                    <p className="mt-1">websocket id: {qrData.websocketId}</p>
+                    <p className="mt-1">public key: {qrData.publicKey}</p>
+                  </>
+                )}
               </>
             ) : (
               <>
@@ -193,18 +276,18 @@ export const Login = () => {
                 >
                   Login
                 </button>
+                <div className="w-full flex justify-between 2xl:mt-[8rem] mt-[4rem] items-center">
+                  <p>Don't have an account?</p>
+                  <button
+                    onClick={() => navigate("/register")}
+                    className="register-button"
+                  >
+                    Register
+                  </button>
+                </div>
               </>
             )}
           </form>
-          <div className="w-full flex justify-between 2xl:mt-[8rem] mt-[4rem] items-center">
-            <p>Don't have an account?</p>
-            <button
-              onClick={() => navigate("/register")}
-              className="register-button"
-            >
-              Register
-            </button>
-          </div>
         </article>
       </section>
     </main>
