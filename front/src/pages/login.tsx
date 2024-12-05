@@ -225,7 +225,12 @@ export const Login = () => {
                 >
                   Confirm
                 </button>
-                {isConnected && (
+                {isConnected && qrData.publicKey.length == 0 && (
+                  <h3 className="w-full text-center mt-10 text-xl">
+                    Connected to Relay server. Generating encryption keys...
+                  </h3>
+                )}
+                {isConnected && qrData.publicKey.length > 0 && (
                   <>
                     <h3 className="w-full text-center mt-10 text-xl">
                       Or scan this qr on Open2FA app
@@ -237,7 +242,10 @@ export const Login = () => {
                     <p className="mt-1">websocket id: {qrData.websocketId}</p>
                     <p className="mt-5">issuer: {qrData.issuer}</p>
                     <p className="mt-1">websocket id: {qrData.websocketId}</p>
-                    <p className="mt-1">public key: {qrData.publicKey}</p>
+                    <p className="mt-1">
+                      public key:{" "}
+                      {qrData.publicKey ? qrData.publicKey : "GENERATING..."}
+                    </p>
                   </>
                 )}
               </>
