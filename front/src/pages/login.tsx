@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { socket } from "../socket";
 import QRCode from "react-qr-code";
+import forge from "node-forge";
 
-interface QrCodeData {
+export interface QrCodeData {
   relayUrl: string;
   publicKey: string;
   websocketId: string;
@@ -18,15 +19,41 @@ export const Login = () => {
   const [passError, setPasssError] = useState("");
   const [twoFACode, setTwoFACode] = useState("");
   const [twoFArequired, setTwoFArequired] = useState(false);
+  const [isTwoFACodeSet, setIsTwoFACodeSet] = useState(false);
   const navigate = useNavigate();
   const [isConnected, setIsConnected] = useState(socket.connected);
+  const privateKeyRef = useRef<null | string>(null);
   const [qrData, setQrData] = useState<QrCodeData>({
     publicKey: "",
-    relayUrl: "10.0.0.189:9999", // TODO make relay listen on ipv4 or on every network card
+    relayUrl: "http://10.0.0.189:9999/sendCode", // TODO make relay listen on ipv4 or on every network card
     websocketId: "",
     issuer: "",
     label: "",
   });
+
+  // generatign these keys takes a lot of time
+  // not suprised to be honest
+  const startKeyGenerationInWorker = () => {
+    const worker = new Worker(new URL("./../rsaWorker.ts", import.meta.url), {
+      type: "module", // Explicitly set worker type as a module
+    });
+
+    worker.onmessage = (e) => {
+      const { keys } = e.data;
+      console.log("Received RSA keys from worker:", keys);
+      privateKeyRef.current = keys.privateKeyPem;
+
+      setQrData((prev) => {
+        return {
+          ...prev,
+          publicKey: keys.publicKeyPem,
+        };
+      });
+      // Set state or do something with the keys
+    };
+
+    worker.postMessage({ generateKeys: true });
+  };
 
   const handleForm = (e: React.ChangeEvent<HTMLInputElement>) => {
     setLoginData((prev) => {
@@ -58,8 +85,10 @@ export const Login = () => {
     return true;
   };
 
-  const handleSubmit = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    e.preventDefault();
+  const handleSubmit = (
+    e?: React.MouseEvent<HTMLButtonElement, MouseEvent>
+  ) => {
+    if (e) e.preventDefault();
     if (handlePassword() && handleEmailSyntax()) {
       fetch(`http://127.0.0.1:3000/login`, {
         method: "POST",
@@ -104,8 +133,9 @@ export const Login = () => {
   };
 
   useEffect(() => {
-    socket.on("connect", () => {
+    socket.on("connect", async () => {
       setIsConnected(true);
+      await startKeyGenerationInWorker();
     });
     socket.on("disconnect", () => setIsConnected(false));
     socket.on("message", (message: string) => {
@@ -119,13 +149,26 @@ export const Login = () => {
         });
       }
     });
-    socket.on("sendCode", (message) => {
-      const digits = parseInt(message);
+    socket.on("sendCode", async (message) => {
+      // TODO decryption of message
+      const digits = message;
       if (digits) {
-        console.log("recieved 2faCode: ", digits);
+        try {
+          if (privateKeyRef.current) {
+            const decryptedData = await decryptData(
+              message,
+              privateKeyRef.current
+            );
+            setTwoFACode(decryptedData);
+            setIsTwoFACodeSet(true);
+          } else {
+            console.error("Private key is not available.");
+          }
+        } catch (err) {
+          console.error("Failed to decrypt the code:", err);
+        }
       }
     });
-    generateRsaKeys();
     return () => {
       socket.off("connect");
       socket.off("disconnect");
@@ -133,71 +176,28 @@ export const Login = () => {
     };
   }, []);
 
-  // Helper function to convert ArrayBuffer to Base64 string
-  const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
-    let binary = "";
-    const bytes = new Uint8Array(buffer);
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]);
+  useEffect(() => {
+    if (isTwoFACodeSet && twoFACode) {
+      handleSubmit();
     }
-    return window.btoa(binary);
-  };
-
-  const generateRsaKeys = async () => {
-    const keyPair = await window.crypto.subtle.generateKey(
-      {
-        name: "RSA-OAEP",
-        modulusLength: 2048,
-        publicExponent: new Uint8Array([1, 0, 1]), // 0x010001
-        hash: "SHA-256",
-      },
-      true, // Whether the keys can be extracted
-      ["encrypt", "decrypt"] // Key usage
-    );
-
-    // Export the public key as an ArrayBuffer
-    const exportPublicKey = async (key: CryptoKey) => {
-      const exported = await window.crypto.subtle.exportKey("spki", key); // spki for public key
-      return exported;
+    return () => {
+      setIsTwoFACodeSet(false);
     };
+  }, [isTwoFACodeSet]);
 
-    const publicKeyBuffer = await exportPublicKey(keyPair.publicKey);
-
-    // Convert the ArrayBuffer to a Base64 string (safe for QR codes)
-    const publicKeyBase64 = arrayBufferToBase64(publicKeyBuffer);
-
-    // Save the base64 encoded public key in your QR data
-    setQrData((prev) => {
-      prev.publicKey = publicKeyBase64; // Store the base64 string instead of PEM
-      return prev;
-    });
-
-    console.log("Public Key (Base64):", publicKeyBase64);
-  };
-
-  const decryptData = async (
-    encryptedDataBase64: string,
-    privateKey: CryptoKey
-  ): Promise<string> => {
-    const encryptedData = Uint8Array.from(atob(encryptedDataBase64), (c) =>
-      c.charCodeAt(0)
-    ); // Decode base64 to bytes
-
+  const decryptData = async (data: string, privateKey: string) => {
     try {
-      const decrypted = await window.crypto.subtle.decrypt(
-        {
-          name: "RSA-OAEP",
-        },
-        privateKey, // Use the private key here
-        encryptedData // The encrypted data
-      );
+      console.log("encrypted data: ", data);
+      console.log("Decrypting private key (pem): ", privateKey);
 
-      // Convert decrypted ArrayBuffer back to string
-      const decoder = new TextDecoder();
-      return decoder.decode(decrypted);
+      // Decrypt the data using the private key
+      const key = forge.pki.privateKeyFromPem(privateKey);
+      const decryptedText = key.decrypt(data, "RSA-OAEP");
+
+      return decryptedText;
     } catch (error) {
       console.error("Decryption failed:", error);
-      return "";
+      throw error;
     }
   };
 
