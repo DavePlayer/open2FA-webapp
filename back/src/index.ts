@@ -44,7 +44,10 @@ app.post("/login", async (req: Request, res: Response) => {
   if (!login || !password) {
     console.log(req.body);
     res.statusMessage = "invalid body structure";
-    return res.status(403).end();
+    return res.status(403).json({
+      codeRequired: false,
+      message: "invalid body structure",
+    });
   }
 
   try {
@@ -56,7 +59,10 @@ app.post("/login", async (req: Request, res: Response) => {
 
     if (!foundUser) {
       res.statusMessage = "User Not Found";
-      return res.status(404).end();
+      return res.status(404).json({
+        codeRequired: false,
+        message: "User not found",
+      });
     }
 
     console.log(foundUser);
@@ -66,8 +72,11 @@ app.post("/login", async (req: Request, res: Response) => {
     if (isMatch) {
       if (!process.env.JWT_SECRET) {
         console.error("JWT_SECRET enviromental variable is undefined");
-        res.statusMessage = "JWT secret is undefined";
-        return res.status(500).end();
+        res.statusMessage = "JWT secret env on server is undefined";
+        return res.status(500).json({
+          codeRequired: false,
+          message: "JWT secret is undefined",
+        });
       }
 
       if (foundUser.isTwoFAon) {
@@ -75,17 +84,20 @@ app.post("/login", async (req: Request, res: Response) => {
           res.statusMessage = "no 2FA code provided";
           return res.status(401).json({
             codeRequired: true,
-            issuer: "OmegaLoveIssac",
+            issuer: process.env.ISSUER || "",
             // this library behaves weirdly for adding this without my info, but ok
-            label: `OmegaLoceIssac:${foundUser.email}`,
+            label: `${process.env.ISSUER || ""}:${foundUser.email}`,
           });
         }
 
         const verified = authenticator.check(code, foundUser.twoFaHash || "");
 
         if (!verified) {
-          res.statusMessage = "invalid Code";
-          return res.status(403).end();
+          res.statusMessage = "invalid 2FA Code";
+          return res.status(404).json({
+            codeRequired: true,
+            message: "invalid 2FA code",
+          });
         }
       }
 
@@ -106,7 +118,7 @@ app.post("/login", async (req: Request, res: Response) => {
     }
   } catch (err) {
     console.error("Error during user lookup:", err);
-    res.status(500).send({ error: "Internal server error", details: err });
+    res.status(500).json({ error: "Internal server error", details: err });
   }
 });
 
@@ -126,7 +138,11 @@ app.post("/getTwoFAQrCode", validateJWT, async (req, res) => {
   }
 
   const secret = authenticator.generateSecret();
-  const uri = authenticator.keyuri(userData.email, "OmegaLoveIssac", secret);
+  const uri = authenticator.keyuri(
+    userData.email,
+    process.env.ISSUER || "",
+    secret
+  );
 
   const image = await qrcode.toDataURL(uri);
 
