@@ -184,7 +184,11 @@ app.post("/registerTwoFA", validateJWT, async (req, res) => {
     return res.status(404).end();
   }
 
+  const expectedCode = authenticator.generate(user.tempTwoFaHash);
+  console.log("Expected Code:", expectedCode);
+
   const verified = authenticator.check(code, user.tempTwoFaHash);
+  console.log("Verification Result:", verified);
 
   if (!verified) {
     res.statusMessage = "code does not match the user secret";
