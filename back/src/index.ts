@@ -80,7 +80,7 @@ app.post("/login", async (req: Request, res: Response) => {
       }
 
       if (foundUser.isTwoFAon) {
-        if (!code) {
+        if (code == undefined || code == null) {
           res.statusMessage = "no 2FA code provided";
           return res.status(401).json({
             codeRequired: true,
@@ -90,12 +90,17 @@ app.post("/login", async (req: Request, res: Response) => {
           });
         }
 
+        if (!code) {
+          return res.status(401).json({
+            message: "2FA code cannot be empty",
+          });
+        }
+
         const verified = authenticator.check(code, foundUser.twoFaHash || "");
 
         if (!verified) {
           res.statusMessage = "invalid 2FA Code";
           return res.status(404).json({
-            codeRequired: true,
             message: "invalid 2FA code",
           });
         }
