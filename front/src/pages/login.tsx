@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { socket } from "../socket";
 import QRCode from "react-qr-code";
 import forge from "node-forge";
+import { debounce } from "lodash";
 
 export interface QrCodeData {
   relayUrl: string;
@@ -23,6 +24,7 @@ export const Login = () => {
   const navigate = useNavigate();
   const [isConnected, setIsConnected] = useState(socket.connected);
   const privateKeyRef = useRef<null | string>(null);
+  const [decryptionInProgress, setDecryptionInProgress] = useState(false);
   const [qrData, setQrData] = useState<QrCodeData>({
     publicKey: "",
     relayUrl: "http://10.0.0.189:9999/sendCode", // TODO make relay listen on ipv4 or on every network card
@@ -30,6 +32,39 @@ export const Login = () => {
     issuer: "",
     label: "",
   });
+
+  // Debounced function that wraps the decryption logic
+  const handleSendCodeDebounced = useRef(
+    debounce(async (message) => {
+      if (decryptionInProgress) return;
+
+      setDecryptionInProgress(true);
+      toast.info("Recieved encrypted 2FA code. Decrypting");
+      const digits = message;
+      if (digits) {
+        try {
+          if (privateKeyRef.current) {
+            const decryptedData = await decryptData(
+              message,
+              privateKeyRef.current
+            );
+            setTwoFACode(decryptedData);
+            setIsTwoFACodeSet(true);
+          } else {
+            toast.error(
+              "private key removed before decryptiom. Shouldn't have happened"
+            );
+            console.error("Private key is not available.");
+          }
+        } catch (err) {
+          toast.error("Failed to decrypt. Try again");
+          console.error("Failed to decrypt the code:", err);
+        } finally {
+          setDecryptionInProgress(false);
+        }
+      }
+    }, 2000) // Debounce delay set to 500ms
+  ).current;
 
   // generatign these keys takes a lot of time
   // not suprised to be honest
@@ -133,11 +168,17 @@ export const Login = () => {
   };
 
   useEffect(() => {
+    console.log(socket);
+    if (qrData.publicKey.length < 5) startKeyGenerationInWorker();
+    socket.connect();
+
     socket.on("connect", async () => {
       setIsConnected(true);
-      await startKeyGenerationInWorker();
     });
-    socket.on("disconnect", () => setIsConnected(false));
+    socket.on("disconnect", () => {
+      setIsConnected(false);
+      console.log("disconected from socket");
+    });
     socket.on("message", (message: string) => {
       console.log(message);
       if (message.includes("connId")) {
@@ -149,30 +190,18 @@ export const Login = () => {
         });
       }
     });
-    socket.on("sendCode", async (message) => {
-      // TODO decryption of message
-      const digits = message;
-      if (digits) {
-        try {
-          if (privateKeyRef.current) {
-            const decryptedData = await decryptData(
-              message,
-              privateKeyRef.current
-            );
-            setTwoFACode(decryptedData);
-            setIsTwoFACodeSet(true);
-          } else {
-            console.error("Private key is not available.");
-          }
-        } catch (err) {
-          console.error("Failed to decrypt the code:", err);
-        }
-      }
-    });
+
+    const handleSendCode = async (message: string) => {
+      handleSendCodeDebounced(message);
+    };
+
+    socket.on("sendCode", handleSendCode);
     return () => {
       socket.off("connect");
       socket.off("disconnect");
       socket.off("message");
+      socket.off("sendCode");
+      socket.disconnect();
     };
   }, []);
 

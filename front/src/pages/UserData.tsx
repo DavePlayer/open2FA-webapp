@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 
 export interface IUser {
   id: string;
@@ -7,9 +8,19 @@ export interface IUser {
 }
 
 export const UserData = () => {
-  const userData = JSON.parse(localStorage.getItem("userData") || "");
+  const [userData, setUserData] = useState({
+    id: null,
+    email: null,
+    token: "",
+  });
+  const navigate = useNavigate();
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [twoFaCode, setTwoFaCode] = useState("");
+
+  const logout = () => {
+    localStorage.setItem("userData", "");
+    return navigate(`/login`);
+  };
 
   const handleGetQR = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     e.preventDefault();
@@ -20,10 +31,16 @@ export const UserData = () => {
         "Content-Type": "application/json",
         Authorization: `${userData.token}`,
       },
-    }).then(async (data) => {
-      const jsonData = await data.json();
-      setQrCode(jsonData.image);
-    });
+    })
+      .then(async (data) => {
+        if (!data.ok) throw data;
+        const jsonData = await data.json();
+        setQrCode(jsonData.image);
+      })
+      .catch((err) => {
+        console.error(err);
+        toast.error(err.statusText);
+      });
   };
 
   const handleSubmit = (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
@@ -37,17 +54,33 @@ export const UserData = () => {
         "Content-Type": "application/json",
         Authorization: `${userData.token}`,
       },
-    }).then(async (data) => {
-      localStorage.setItem(
-        "userData",
-        JSON.stringify({
-          ...userData,
-          is2FAon: true,
-        })
-      );
-      setQrCode(null);
-    });
+    })
+      .then(async (data) => {
+        if (!data.ok) throw data;
+        localStorage.setItem(
+          "userData",
+          JSON.stringify({
+            ...userData,
+            is2FAon: true,
+          })
+        );
+        setQrCode(null);
+      })
+      .catch((err) => {
+        console.error(err);
+        toast.error(err.statusText);
+      });
   };
+
+  useEffect(() => {
+    setUserData(
+      JSON.parse(localStorage.getItem("userData") || "{}") || {
+        id: null,
+        email: null,
+        token: "",
+      }
+    );
+  }, []);
 
   return (
     <main className="flex flex-wrap h-[100vh] bg-mainBg">
@@ -55,7 +88,7 @@ export const UserData = () => {
         <section className="w-full m-auto flex justify-center items-center text-default-color">
           <article className="flex flex-col 2xl:w-1/2 w-3/4 ">
             <h1 className="text-3xl text-center">User Data</h1>
-            <p className="text-xl mt-5">id: {userData?.id || 9999}</p>
+            <p className="text-xl mt-5">id: {userData?.id || "No Id"}</p>
             <p className="text-xl mt-5">name: {userData?.email || "no name"}</p>
           </article>
         </section>
@@ -84,12 +117,20 @@ export const UserData = () => {
               </button>
             </>
           ) : (
-            <button
-              onClick={(e) => handleGetQR(e)}
-              className="w-full gradient-button"
-            >
-              Setup 2FA
-            </button>
+            <>
+              <button
+                onClick={(e) => handleGetQR(e)}
+                className="w-full gradient-button"
+              >
+                Setup 2FA
+              </button>
+              <button
+                onClick={() => logout()}
+                className="w-full button register-button mt-5"
+              >
+                Logout
+              </button>
+            </>
           )}
         </form>
       </div>
