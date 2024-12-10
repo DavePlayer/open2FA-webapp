@@ -37,16 +37,16 @@ app.get("/", (req: Request, res: Response) => {
 
 app.post("/login", async (req: Request, res: Response) => {
   if (!req.body) {
-    return res.status(400).send("Request body is missing");
+    return res.status(400).send("Brak obiektu Body w zapytaniu");
   }
   const { login, password, code } = req.body;
 
   if (!login || !password) {
     console.log(req.body);
-    res.statusMessage = "invalid body structure";
+    res.statusMessage = "Niepoprawna konstrukcja obiektu Body";
     return res.status(403).json({
       codeRequired: false,
-      message: "invalid body structure",
+      message: "Niepoprawna konstrukcja obiektu Body",
     });
   }
 
@@ -58,10 +58,10 @@ app.post("/login", async (req: Request, res: Response) => {
     });
 
     if (!foundUser) {
-      res.statusMessage = "User Not Found";
+      res.statusMessage = "User not found";
       return res.status(404).json({
         codeRequired: false,
-        message: "User not found",
+        message: "Nie znaleziono użytkownika",
       });
     }
 
@@ -71,17 +71,17 @@ app.post("/login", async (req: Request, res: Response) => {
 
     if (isMatch) {
       if (!process.env.JWT_SECRET) {
-        console.error("JWT_SECRET enviromental variable is undefined");
-        res.statusMessage = "JWT secret env on server is undefined";
+        console.error("Nie ustawiono sekretu JWT_SECRET na serwerze");
+        res.statusMessage = "Sekret JWT niezdefinowany na serwerze";
         return res.status(500).json({
           codeRequired: false,
-          message: "JWT secret is undefined",
+          message: "Sekret JWT niezdefiniowany",
         });
       }
 
       if (foundUser.isTwoFAon) {
         if (code == undefined || code == null) {
-          res.statusMessage = "no 2FA code provided";
+          res.statusMessage = "Nie podano kodu 2FA";
           return res.status(401).json({
             codeRequired: true,
             issuer: process.env.ISSUER || "",
@@ -92,16 +92,16 @@ app.post("/login", async (req: Request, res: Response) => {
 
         if (!code) {
           return res.status(401).json({
-            message: "2FA code cannot be empty",
+            message: "Kod 2FA nie może być pusty",
           });
         }
 
         const verified = authenticator.check(code, foundUser.twoFaHash || "");
 
         if (!verified) {
-          res.statusMessage = "invalid 2FA Code";
+          res.statusMessage = "Niepoprawny kod 2FA";
           return res.status(404).json({
-            message: "invalid 2FA code",
+            message: "Niepoprawny kod 2FA",
           });
         }
       }
@@ -118,12 +118,12 @@ app.post("/login", async (req: Request, res: Response) => {
       });
     } else {
       console.log(password, foundUser.password);
-      res.statusMessage = "Passwords do not match";
+      res.statusMessage = "Hasła się nie zgadzają";
       return res.status(403).end();
     }
   } catch (err) {
     console.error("Error during user lookup:", err);
-    res.status(500).json({ error: "Internal server error", details: err });
+    res.status(500).json({ error: "Wewnętrzny błąd serwera", details: err });
   }
 });
 
@@ -138,7 +138,8 @@ app.post("/getTwoFAQrCode", validateJWT, async (req, res) => {
   });
 
   if (!user) {
-    res.statusMessage = "sth went wrong. user for qrimage does not exist";
+    res.statusMessage =
+      "Użytkownik dla kody QR nie istnieje. Coś poszło nie tak";
     return res.status(500).end();
   }
 
@@ -162,7 +163,7 @@ app.post("/getTwoFAQrCode", validateJWT, async (req, res) => {
 
 app.post("/registerTwoFA", validateJWT, async (req, res) => {
   if (!req.body) {
-    return res.status(400).send("Request body is missing");
+    return res.status(400).send("Brak obiektu Body");
   }
   const { code, token } = req.body;
 
@@ -174,18 +175,19 @@ app.post("/registerTwoFA", validateJWT, async (req, res) => {
 
   if (!code) {
     console.log(req.body);
-    res.statusMessage = "invalid body structure";
+    res.statusMessage = "Niepoprawna budowa obiektu Body";
     return res.status(403).end();
   }
 
   if (!user) {
-    res.statusMessage = "sth went wrong. user for code a user does not exist";
+    res.statusMessage =
+      "Użytkownik dla kody QR nie istnieje. Coś poszło nie tak";
     return res.status(500).end();
   }
 
   if (user.isTwoFAon == false || user.tempTwoFaHash == null) {
     res.statusMessage =
-      "User is not ready to have 2fa ON. no qr image for an app was created prior";
+      "Użytkownik nie jest gotowy by włączyć 2FA. Nie wygenerowano wcześniej żadnego kodu";
     return res.status(404).end();
   }
 
@@ -196,7 +198,7 @@ app.post("/registerTwoFA", validateJWT, async (req, res) => {
   console.log("Verification Result:", verified);
 
   if (!verified) {
-    res.statusMessage = "code does not match the user secret";
+    res.statusMessage = "Kod nie zgadza się z sekretem";
     return res.status(403).end();
   }
 
@@ -212,12 +214,12 @@ app.post("/registerTwoFA", validateJWT, async (req, res) => {
 
 app.post("/register", async (req: Request, res: Response) => {
   if (!req.body) {
-    return res.status(400).send("Request body is missing");
+    return res.status(400).send("Brak obiektu Body w zapytaniu");
   }
   const { login, password } = req.body;
 
   if (!login || !password)
-    return res.status(403).send("invalid body structure");
+    return res.status(403).send("Niepoprawna budowa obiektu Body");
   try {
     const foundUser = await User.findOne({
       where: {
@@ -242,11 +244,11 @@ app.post("/register", async (req: Request, res: Response) => {
       });
     }
 
-    res.statusMessage = "user already exist";
+    res.statusMessage = "Użytkownik już istnieje";
     return res.status(408).end();
   } catch (err) {
     console.error("Error during user lookup:", err);
-    res.status(500).send({ error: "Internal server error", details: err });
+    res.status(500).send({ error: "Wewnętrzny błąd serwera", details: err });
   }
 });
 
