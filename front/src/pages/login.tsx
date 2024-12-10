@@ -39,7 +39,7 @@ export const Login = () => {
       if (decryptionInProgress) return;
 
       setDecryptionInProgress(true);
-      toast.info("Recieved encrypted 2FA code. Decrypting");
+      toast.info("Otrzymano kod 2FA. Deszyfrowanie");
       const digits = message;
       if (digits) {
         try {
@@ -52,12 +52,12 @@ export const Login = () => {
             setIsTwoFACodeSet(true);
           } else {
             toast.error(
-              "private key removed before decryptiom. Shouldn't have happened"
+              "Klucz prywatny usunięty zanim odszyfrowano kod. To nie powinno było się wydarzyć"
             );
             console.error("Private key is not available.");
           }
         } catch (err) {
-          toast.error("Failed to decrypt. Try again");
+          toast.error("Nie udało się odszyfrować wiadomości. Sprubuj ponownie");
           console.error("Failed to decrypt the code:", err);
         } finally {
           setDecryptionInProgress(false);
@@ -103,7 +103,7 @@ export const Login = () => {
     const regex =
       /(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/;
     if (!regex.test(loginData.email)) {
-      setEmailError("invalid email format");
+      setEmailError("Niepoprawny format e-mail");
     } else {
       setEmailError("");
     }
@@ -113,7 +113,7 @@ export const Login = () => {
   const handlePassword = () => {
     const { password } = loginData;
     if (password.length === 0) {
-      setPasssError("password too short");
+      setPasssError("Hasło zbyt krótkie");
       return false;
     }
     setPasssError("");
@@ -161,7 +161,7 @@ export const Login = () => {
               return prev;
             });
           } else {
-            toast.error(err.message || "An error occurred");
+            toast.error(err.message || "Pojawił się błąd");
           }
         });
     }
@@ -238,13 +238,13 @@ export const Login = () => {
             {twoFArequired ? (
               <>
                 <p className="mt-10 mb-5 text-xl text-center">
-                  Please login to your account
+                  Zaloguj się do swojego konta
                 </p>
                 <input
                   className="w-full"
                   type="number"
                   name="2FACode"
-                  placeholder="2FA Code"
+                  placeholder="Kod 2FA"
                   value={twoFACode}
                   onChange={(e) => setTwoFACode(e.target.value)}
                 />
@@ -252,36 +252,37 @@ export const Login = () => {
                   onClick={(e) => handleSubmit(e)}
                   className="w-full gradient-button"
                 >
-                  Confirm
+                  Potwierdź
                 </button>
                 {isConnected && qrData.publicKey.length == 0 && (
                   <h3 className="w-full text-center mt-10 text-xl">
-                    Connected to Relay server. Generating encryption keys...
+                    Połączono z serwerem przekaźnika. Generowanie kluczy
+                    szyfrujących...
                   </h3>
                 )}
                 {isConnected && qrData.publicKey.length > 0 && (
                   <>
                     <h3 className="w-full text-center mt-10 text-xl">
-                      Or scan this qr on Open2FA app
+                      Albo zeskanuj ten kod QR w aplikacji Open2FA
                     </h3>
                     <div className="flex justify-center items-center mt-5 w-2/3 mx-auto bg-white aspect-square">
                       <QRCode value={JSON.stringify(qrData)} />
                     </div>
-                    <p className="mt-5">relay url: {qrData.relayUrl}</p>
+                    {/* <p className="mt-5">relay url: {qrData.relayUrl}</p>
                     <p className="mt-1">websocket id: {qrData.websocketId}</p>
                     <p className="mt-5">issuer: {qrData.issuer}</p>
                     <p className="mt-1">websocket id: {qrData.websocketId}</p>
                     <p className="mt-1">
                       public key:{" "}
                       {qrData.publicKey ? qrData.publicKey : "GENERATING..."}
-                    </p>
+                    </p> */}
                   </>
                 )}
               </>
             ) : (
               <>
                 <p className="mt-10 mb-5 text-xl text-center">
-                  Please login to your account
+                  Zaloguj się do swojego konta
                 </p>
                 <p className="w-full mb-1 pl-4 text-error text-sm">
                   {emailError}
@@ -302,7 +303,7 @@ export const Login = () => {
                   className="w-full"
                   type="password"
                   name="password"
-                  placeholder="Password"
+                  placeholder="Hasło"
                   value={loginData.password}
                   onChange={(e) => handleForm(e)}
                   onBlur={() => handlePassword()}
@@ -314,12 +315,12 @@ export const Login = () => {
                   Login
                 </button>
                 <div className="w-full flex justify-between 2xl:mt-[8rem] mt-[4rem] items-center">
-                  <p>Don't have an account?</p>
+                  <p>Nie masz konta?</p>
                   <button
                     onClick={() => navigate("/register")}
                     className="register-button"
                   >
-                    Register
+                    Zarejestruj się
                   </button>
                 </div>
               </>

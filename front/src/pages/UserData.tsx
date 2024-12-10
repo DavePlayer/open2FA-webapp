@@ -87,9 +87,11 @@ export const UserData = () => {
       <div className="w-1/2 flex-col m-auto flex justify-center items-center text-default-color">
         <section className="w-full m-auto flex justify-center items-center text-default-color">
           <article className="flex flex-col 2xl:w-1/2 w-3/4 ">
-            <h1 className="text-3xl text-center">User Data</h1>
-            <p className="text-xl mt-5">id: {userData?.id || "No Id"}</p>
-            <p className="text-xl mt-5">name: {userData?.email || "no name"}</p>
+            <h1 className="text-3xl text-center">Dane użytkownika</h1>
+            <p className="text-xl mt-5">Id: {userData?.id || "No Id"}</p>
+            <p className="text-xl mt-5">
+              Email: {userData?.email || "no name"}
+            </p>
           </article>
         </section>
         <form
@@ -113,7 +115,7 @@ export const UserData = () => {
                 onClick={(e) => handleSubmit(e)}
                 className="w-full gradient-button"
               >
-                set new 2FA
+                Ustaw nowe 2FA
               </button>
             </>
           ) : (
@@ -122,13 +124,13 @@ export const UserData = () => {
                 onClick={(e) => handleGetQR(e)}
                 className="w-full gradient-button"
               >
-                Setup 2FA
+                Ustaw 2FA
               </button>
               <button
                 onClick={() => logout()}
                 className="w-full button register-button mt-5"
               >
-                Logout
+                Wyloguj
               </button>
             </>
           )}

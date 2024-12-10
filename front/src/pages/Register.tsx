@@ -21,7 +21,7 @@ export const Register = () => {
     const regex =
       /(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/;
     if (!regex.test(loginData.email)) {
-      setEmailError("invalid email format");
+      setEmailError("Niepoprawny format e-mail");
     } else {
       setEmailError("");
     }
@@ -31,7 +31,7 @@ export const Register = () => {
   const handlePassword = () => {
     const { password } = loginData;
     if (password.length === 0) {
-      setPasssError("password too short");
+      setPasssError("Hasło zbyt krótkie");
       return false;
     }
     setPasssError("");
@@ -70,7 +70,7 @@ export const Register = () => {
         <article className="flex flex-col 2xl:w-1/2 w-3/4 ">
           <form action="#" className="w-full">
             <p className="mt-10 mb-5 text-xl text-center">
-              Register new Account
+              Zarejestruj nowe konto
             </p>
             <p className="w-full mb-1 pl-4 text-error text-sm">{emailError}</p>
             <input
@@ -87,7 +87,7 @@ export const Register = () => {
               className="w-full"
               type="password"
               name="password"
-              placeholder="Password"
+              placeholder="Hasło"
               value={loginData.password}
               onChange={(e) => handleForm(e)}
               onBlur={() => handlePassword()}
@@ -96,7 +96,13 @@ export const Register = () => {
               onClick={(e) => handleSubmit(e)}
               className="w-full gradient-button"
             >
-              Register
+              Zarejestruj
+            </button>
+            <button
+              onClick={() => navigate("/login")}
+              className="register-button mt-5 ml-auto block"
+            >
+              Powrót
             </button>
           </form>
         </article>
